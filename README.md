@@ -2,6 +2,9 @@
 
 MauiKit authentication agent for Polkit sessions on Nitrux.
 
+![NX Polkit Agent](https://nxos.org/wp-content/uploads/2026/08/screenshot-20260814-092831.png)
+> A PolicyKit authentication agent built with MauiKit.
+
 The agent uses PolkitQt6’s authentication-agent API for registration and PAM
 conversation handling.
 
