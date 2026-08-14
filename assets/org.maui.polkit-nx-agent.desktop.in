@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=MauiKit Polkit Authentication Agent
+Comment=Authenticate privileged actions for the current user session
+Exec=@CMAKE_INSTALL_FULL_LIBEXECDIR@/polkit-nx-agent
+OnlyShowIn=Hyprland;
+NoDisplay=true
+Terminal=false
+X-GNOME-Autostart-Phase=Application
+X-GNOME-AutoRestart=true

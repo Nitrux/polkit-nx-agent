@@ -1,0 +1,25 @@
+# Operating-system and editor files
+*.directory
+*.DS_Store
+*.bak
+*.swp
+*.swo
+/.project
+*.user
+*.user.*
+
+# CMake and build outputs
+/build/
+/build-*/
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+compile_commands.json
+install_manifest.txt
+Makefile
+*.ninja
+*.ninja_deps
+*.ninja_log
+
+# Qt generated files
+*.qmlc
