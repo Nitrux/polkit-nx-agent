@@ -5,6 +5,8 @@
 #include <QQmlContext>
 #include <QSurfaceFormat>
 #include <QUrl>
+#include <KLocalizedContext>
+#include <KLocalizedString>
 #include <MauiKit4/Core/mauiapp.h>
 #include "polkitagent.h"
 int main(int argc, char *argv[]) {
@@ -12,10 +14,12 @@ int main(int argc, char *argv[]) {
     QGuiApplication app(argc, argv);
     app.setOrganizationName(QStringLiteral("Maui"));
     app.setApplicationName(QStringLiteral("polkit-nx-agent"));
+    KLocalizedString::setApplicationDomain(QByteArrayLiteral("polkit-nx-agent"));
     app.setWindowIcon(QIcon::fromTheme(QStringLiteral("dialog-password")));
     MauiApp::instance()->setIconName(QStringLiteral("dialog-password"));
     PolkitAgent agent; if (!agent.registerForCurrentSession()) return 1;
     QQmlApplicationEngine engine;
+    engine.rootContext()->setContextObject(new KLocalizedContext(&engine));
     engine.rootContext()->setContextProperty(QStringLiteral("agent"), &agent);
     const QUrl url(QStringLiteral("qrc:/app/maui/polkitnxagent/main.qml"));
     QObject::connect(&engine, &QQmlApplicationEngine::objectCreated, &app,

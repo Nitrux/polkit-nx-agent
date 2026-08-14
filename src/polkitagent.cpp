@@ -1,6 +1,10 @@
 #include "polkitagent.h"
 
 #include <QDebug>
+#include <QFileInfo>
+#include <QImageReader>
+#include <QRegularExpression>
+#include <QSettings>
 #include <pwd.h>
 #include <unistd.h>
 
@@ -13,19 +17,90 @@ QString labelFor(const QString &raw)
     bool ok = false;
     const uid_t uid = value.toUInt(&ok);
     if (!ok)
-        return value;
+    {
+        const QByteArray usernameData = value.toLocal8Bit();
+        const struct passwd *entry = getpwnam(usernameData.constData());
+        if (!entry || !entry->pw_name)
+            return value;
+
+        const QString username = QString::fromLocal8Bit(entry->pw_name);
+        QSettings account(QStringLiteral("/var/lib/AccountsService/users/") + username,
+                          QSettings::IniFormat);
+        const QString accountName = account.value(QStringLiteral("User/RealName")).toString().trimmed();
+        if (!accountName.isEmpty())
+            return accountName;
+
+        const QString realName = QString::fromLocal8Bit(entry->pw_gecos).section(QStringLiteral(","), 0, 0).trimmed();
+        return realName.isEmpty() ? username : realName;
+    }
     struct passwd entry {};
     struct passwd *result = nullptr;
     char buffer[4096] {};
     if (getpwuid_r(uid, &entry, buffer, sizeof(buffer), &result) == 0 &&
-        result && result->pw_name)
-        return QString::fromLocal8Bit(result->pw_name);
+        result && result->pw_name) {
+        const QString username = QString::fromLocal8Bit(result->pw_name);
+        QSettings account(QStringLiteral("/var/lib/AccountsService/users/") + username,
+                          QSettings::IniFormat);
+        const QString accountName = account.value(QStringLiteral("User/RealName")).toString().trimmed();
+        if (!accountName.isEmpty())
+            return accountName;
+
+        const QString realName = QString::fromLocal8Bit(result->pw_gecos).section(QStringLiteral(","), 0, 0).trimmed();
+        return realName.isEmpty() ? username : realName;
+    }
     return value;
 }
 
 QString detail(const PolkitQt1::Details &details, const QString &key)
 {
     return details.keys().contains(key) ? details.lookup(key) : QString();
+}
+
+QString avatarPathForIdentity(const QString &identity)
+{
+    if (!identity.startsWith(QStringLiteral("unix-user:")))
+        return {};
+
+    bool ok = false;
+    const uid_t uid = identity.mid(10).toUInt(&ok);
+    struct passwd entry {};
+    struct passwd *result = nullptr;
+    char buffer[4096] {};
+    QString username;
+    QString home;
+    if (ok) {
+        if (getpwuid_r(uid, &entry, buffer, sizeof(buffer), &result) != 0 ||
+            !result || !result->pw_name || !result->pw_dir)
+            return {};
+        username = QString::fromLocal8Bit(result->pw_name);
+        home = QString::fromLocal8Bit(result->pw_dir);
+    } else {
+        const QByteArray usernameData = identity.mid(10).toLocal8Bit();
+        const struct passwd *namedEntry = getpwnam(usernameData.constData());
+        if (!namedEntry || !namedEntry->pw_name || !namedEntry->pw_dir)
+            return {};
+        username = QString::fromLocal8Bit(namedEntry->pw_name);
+        home = QString::fromLocal8Bit(namedEntry->pw_dir);
+    }
+
+    const QStringList candidates{
+        home + QStringLiteral("/.face"),
+        home + QStringLiteral("/.face.icon"),
+        QStringLiteral("/var/lib/AccountsService/icons/") + username,
+    };
+
+    for (const QString &candidate : candidates) {
+        const QFileInfo info(candidate);
+        if (!info.isFile() || !info.isReadable())
+            continue;
+
+        QImageReader reader(candidate);
+        reader.setDecideFormatFromContent(true);
+        if (reader.canRead())
+            return candidate;
+    }
+
+    return {};
 }
 }
 
@@ -79,6 +154,17 @@ GETTER(info, QString, m_info)
 GETTER(error, QString, m_error)
 #undef GETTER
 
+QUrl PolkitAgent::avatarUrl() const
+{
+    if (m_selectedIdentity < 0 || m_selectedIdentity >= m_identities.size())
+        return QUrl(QStringLiteral("qrc:/app/maui/polkitnxagent/icons/user-avatar.svg"));
+
+    const QString path = avatarPathForIdentity(m_identities.at(m_selectedIdentity).toString());
+    return path.isEmpty()
+        ? QUrl(QStringLiteral("qrc:/app/maui/polkitnxagent/icons/user-avatar.svg"))
+        : QUrl::fromLocalFile(path);
+}
+
 void PolkitAgent::initiateAuthentication(const QString &actionId, const QString &message,
     const QString &iconName, const PolkitQt1::Details &details, const QString &cookie,
     const PolkitQt1::Identity::List &identities, PolkitQt1::Agent::AsyncResult *result)
@@ -108,6 +194,19 @@ void PolkitAgent::initiateAuthentication(const QString &actionId, const QString 
     m_command = detail(details, QStringLiteral("command_line"));
     if (m_command.isEmpty()) m_command = detail(details, QStringLiteral("cmdline"));
     if (m_command.isEmpty()) m_command = detail(details, QStringLiteral("command"));
+    if (m_command.isEmpty()) {
+        static const QRegularExpression quotedCommand(
+            QStringLiteral("[`'\\\"\\x{201c}\\x{201d}\\x{2018}\\x{2019}]([^`'\\\"\\x{201c}\\x{201d}\\x{2018}\\x{2019}]+)[`'\\\"\\x{201c}\\x{201d}\\x{2018}\\x{2019}]"));
+        const QRegularExpressionMatch match = quotedCommand.match(m_message);
+        if (match.hasMatch())
+            m_command = match.captured(1);
+    }
+    if (m_command.isEmpty()) {
+        static const QRegularExpression pathCommand(QStringLiteral("(/[A-Za-z0-9_./+:-]+)"));
+        const QRegularExpressionMatch match = pathCommand.match(m_message);
+        if (match.hasMatch())
+            m_command = match.captured(1);
+    }
 
     for (const auto &identity : m_identities) {
         const QString raw = identity.toString();
@@ -136,6 +235,7 @@ void PolkitAgent::initiateAuthentication(const QString &actionId, const QString 
         }
     }
     Q_EMIT selectedIdentityChanged();
+    Q_EMIT avatarChanged();
 
     m_cancelRequested = false;
     m_restarting = false;
@@ -222,6 +322,7 @@ void PolkitAgent::selectIdentity(int index)
 
     m_selectedIdentity = index;
     Q_EMIT selectedIdentityChanged();
+    Q_EMIT avatarChanged();
     m_restarting = true;
     setPrompt(QString(), false);
     setInfo(QString());

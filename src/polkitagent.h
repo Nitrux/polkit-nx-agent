@@ -3,6 +3,7 @@
 #include <QString>
 #include <QVariantList>
 #include <QVariantMap>
+#include <QUrl>
 #include <PolkitQt1/Agent/Listener>
 #include <PolkitQt1/Agent/Session>
 #include <PolkitQt1/Details>
@@ -17,6 +18,7 @@ class PolkitAgent final : public PolkitQt1::Agent::Listener {
     Q_PROPERTY(QString iconName READ iconName NOTIFY requestChanged)
     Q_PROPERTY(QVariantList identities READ identities NOTIFY requestChanged)
     Q_PROPERTY(int selectedIdentity READ selectedIdentity NOTIFY selectedIdentityChanged)
+    Q_PROPERTY(QUrl avatarUrl READ avatarUrl NOTIFY avatarChanged)
     Q_PROPERTY(QVariantList details READ details NOTIFY requestChanged)
     Q_PROPERTY(QString vendor READ vendor NOTIFY requestChanged)
     Q_PROPERTY(QString vendorUrl READ vendorUrl NOTIFY requestChanged)
@@ -32,6 +34,7 @@ public:
     bool active() const; QString actionId() const; QString message() const;
     QString iconName() const; QVariantList identities() const;
     int selectedIdentity() const; QVariantList details() const;
+    QUrl avatarUrl() const;
     QString vendor() const; QString vendorUrl() const; QString command() const;
     QString prompt() const; bool echo() const; QString info() const; QString error() const;
     Q_INVOKABLE void submitResponse(const QString &response);
@@ -44,7 +47,7 @@ public Q_SLOTS:
     void cancelAuthentication() override;
     bool initiateAuthenticationFinish() override;
 Q_SIGNALS:
-    void activeChanged(); void requestChanged(); void selectedIdentityChanged();
+    void activeChanged(); void requestChanged(); void selectedIdentityChanged(); void avatarChanged();
     void promptChanged(); void infoChanged(); void errorChanged();
 private:
     void createSession(); void finish(bool); void setActive(bool);
