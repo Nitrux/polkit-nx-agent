@@ -36,10 +36,6 @@ ecm_find_qmlmodule(org.mauikit.controls 1.0)
 qt_policy(SET QTP0001 NEW)
 qt_policy(SET QTP0004 NEW)
 add_subdirectory(src)
-configure_file(assets/org.maui.polkit-nx-agent.desktop.in
-    ${CMAKE_CURRENT_BINARY_DIR}/org.maui.polkit-nx-agent.desktop @ONLY)
-install(FILES ${CMAKE_CURRENT_BINARY_DIR}/org.maui.polkit-nx-agent.desktop
-    DESTINATION ${KDE_INSTALL_AUTOSTARTDIR})
 feature_summary(WHAT ALL FATAL_ON_MISSING_REQUIRED_PACKAGES)
 if(NOT TARGET uninstall)
     configure_file("${CMAKE_CURRENT_SOURCE_DIR}/cmake_uninstall.cmake.in"
