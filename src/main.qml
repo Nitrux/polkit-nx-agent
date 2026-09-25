@@ -92,9 +92,13 @@ Maui.ApplicationWindow {
 
             Maui.Chip {
                 Layout.alignment: Qt.AlignHCenter
+                Layout.fillWidth: true
+                Layout.maximumWidth: parent.width
                 visible: root.displayedCommand.length > 0
                 text: root.displayedCommand
                 font.family: Maui.Style.monospacedFont.family
+                label.wrapMode: Text.NoWrap
+                label.elide: Text.ElideMiddle
             }
 
             Item {
@@ -180,6 +184,7 @@ Maui.ApplicationWindow {
                     label1.text: qsTr("Program")
                     label2.text: root.displayedCommand
                     label2.font.family: Maui.Style.monospacedFont.family
+                    label2.elide: Text.ElideMiddle
                 }
 
                 Repeater {
