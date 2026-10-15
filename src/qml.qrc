@@ -1,0 +1,6 @@
+<RCC>
+    <qresource prefix="/app/maui/polkitnxagent">
+        <file>main.qml</file>
+        <file alias="icons/user-avatar.svg">../icons/user-avatar.svg</file>
+    </qresource>
+</RCC>
