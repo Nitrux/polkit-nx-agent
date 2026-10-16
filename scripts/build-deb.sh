@@ -32,7 +32,7 @@ Priority: optional
 Architecture: ${TARGET_ARCH}
 Maintainer: uri_herrera@nxos.org
 Provides: polkit-nx-agent
-Depends: mauikit (>= 4.0.5),polkitd,libpolkit-qt6-1-1,qml6-module-qtquick-controls,qml6-module-qtquick-layouts,qt6-wayland
+Depends: mauikit (>= 4.0.5),polkitd,libpolkit-qt6-1-1,qml6-module-qtquick,qml6-module-qtquick-controls,qml6-module-qtquick-layouts,qt6-wayland
 Description: polkit-nx-agent
  polkit-nx-agent
 CONTROL
