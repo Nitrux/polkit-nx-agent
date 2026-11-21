@@ -8,3 +8,11 @@ target_link_libraries(${PROJECT_NAME} PRIVATE MauiKit4 KF6::I18n KF6::I18nQml Qt
 install(TARGETS ${PROJECT_NAME}
     RUNTIME DESTINATION ${KDE_INSTALL_LIBEXECDIR})
 qt_finalize_target(${PROJECT_NAME})
+
+target_precompile_headers(${PROJECT_NAME} PRIVATE
+    <QDebug>
+    <QFileInfo>
+    <QGuiApplication>
+    <QQmlEngine>
+    <QQuickWindow>
+)
