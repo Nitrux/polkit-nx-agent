@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(polkit-nx-agent VERSION 0.1.0 LANGUAGES CXX)
+project(polkit-nx-agent VERSION 0.0.2 LANGUAGES CXX)
 
 if(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
     set(CMAKE_INSTALL_PREFIX "/usr" CACHE PATH "Install path prefix" FORCE)
