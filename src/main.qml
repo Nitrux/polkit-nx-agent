@@ -1,22 +1,25 @@
 import QtQuick
+import QtQuick.Window
 import QtQuick.Controls
 import QtQuick.Layouts
 import org.mauikit.controls as Maui
 
-Maui.ApplicationWindow {
+Maui.DialogWindow {
     id: root
 
     title: qsTr("Nitrux PolicyKit Agent")
-    width: 440
-    height: 600
-    minimumWidth: 440
-    maximumWidth: 440
-    minimumHeight: 360
-    maximumHeight: 600
+    readonly property int dialogWidth: Math.min(Screen.desktopAvailableWidth, Maui.Style.units.gridUnit * 24)
+    readonly property int dialogHeight: Math.min(Screen.desktopAvailableHeight, contentColumn.implicitHeight + page.footBar.implicitHeight)
+    width: dialogWidth
+    minimumWidth: dialogWidth
+    maximumWidth: dialogWidth
+    height: dialogHeight
+    minimumHeight: dialogHeight
+    maximumHeight: dialogHeight
     visible: agent.active
     color: "transparent"
     background: null
-    flags: Qt.Window | Qt.WindowStaysOnTopHint
+    flags: Qt.Dialog | Qt.WindowStaysOnTopHint
 
     Maui.WindowBlur {
         view: root
@@ -25,7 +28,7 @@ Maui.ApplicationWindow {
         enabled: true
     }
 
-    Rectangle {
+    page.background: Rectangle {
         anchors.fill: parent
         color: Maui.Theme.backgroundColor
         opacity: 0.76
@@ -83,223 +86,218 @@ Maui.ApplicationWindow {
         }
     }
 
-    Maui.Page {
-        id: authenticationPage
-        anchors.fill: parent
-        background: null
-        flickable: contentColumn.flickable
-        headBar.visible: false
-        footBar.visible: true
-        footBar.background: null
-        footBar.preferredHeight: Maui.Style.rowHeightAlt
-        footBar.topPadding: Maui.Style.defaultPadding
-        footBar.bottomPadding: Maui.Style.defaultPadding
-        footBar.forceCenterMiddleContent: true
-        footBar.middleContent: Item {
-            Layout.fillWidth: true
-            implicitHeight: actionsRow.implicitHeight
+    page.flickable: contentColumn.flickable
+    page.headBar.visible: false
+    page.footBar.visible: true
+    page.footBar.background: null
+    page.footBar.preferredHeight: Maui.Style.rowHeightAlt
+    page.footBar.topPadding: Maui.Style.defaultPadding
+    page.footBar.bottomPadding: Maui.Style.defaultPadding
+    page.footBar.forceCenterMiddleContent: true
+    page.footBar.middleContent: Item {
+        Layout.fillWidth: true
+        implicitHeight: actionsRow.implicitHeight
 
-            RowLayout {
-                id: actionsRow
-                anchors.centerIn: parent
-                width: implicitWidth
-                height: implicitHeight
+        RowLayout {
+            id: actionsRow
+            anchors.centerIn: parent
+            width: implicitWidth
+            height: implicitHeight
+            spacing: Maui.Style.space.small
+
+            Button {
+                text: qsTr("Cancel (%1)").arg(root.remainingSeconds)
+                onClicked: agent.cancel()
+            }
+
+            Button {
+                text: qsTr("Authorize")
+                enabled: passwordField.text.length > 0
+                Maui.Controls.status: Maui.Controls.Positive
+                onClicked: root.submitResponse()
+            }
+        }
+    }
+
+    Maui.ScrollColumn {
+        id: contentColumn
+        anchors.fill: parent
+        clip: true
+        spacing: Maui.Style.space.small
+
+        Maui.SectionHeader {
+            Layout.fillWidth: true
+            text1: qsTr("Authorization Required")
+            text2: root.displayedCommand.length > 0
+                ? qsTr("Authentication is needed to run the following program as the superuser.")
+                : (agent.message || qsTr("Authentication is needed to continue"))
+            template.label1.font.pointSize: Maui.Style.defaultFont.pointSize + 2
+            template.label1.font.bold: true
+            template.label1.color: Maui.Theme.textColor
+            template.label1.horizontalAlignment: Text.AlignHCenter
+            template.label2.font.pointSize: Maui.Style.defaultFont.pointSize
+            template.label2.color: Maui.Theme.textColor
+            template.label2.wrapMode: Text.WordWrap
+            template.label2.horizontalAlignment: Text.AlignHCenter
+        }
+
+        Rectangle {
+            Layout.fillWidth: true
+            color: Maui.Theme.alternateBackgroundColor
+            radius: Maui.Style.radiusV
+            border.color: Maui.Theme.backgroundColor
+            border.width: 1
+            implicitHeight: authenticationSection.implicitHeight + Maui.Style.contentMargins * 2
+
+            ColumnLayout {
+                id: authenticationSection
+                anchors.fill: parent
+                anchors.margins: Maui.Style.contentMargins
                 spacing: Maui.Style.space.small
 
-                Button {
-                    text: qsTr("Cancel (%1)").arg(root.remainingSeconds)
-                    onClicked: agent.cancel()
+                Maui.SectionHeader {
+                    Layout.fillWidth: true
+                    text1: qsTr("Authentication")
+                    text2: qsTr("Enter your credentials to authorize this request.")
+                    label2.wrapMode: Text.Wrap
                 }
 
-                Button {
-                    text: qsTr("Authorize")
-                    enabled: passwordField.text.length > 0
-                    Maui.Controls.status: Maui.Controls.Positive
-                    onClicked: root.submitResponse()
+                Maui.IconItem {
+                    Layout.alignment: Qt.AlignHCenter
+                    Layout.preferredWidth: 128
+                    Layout.preferredHeight: 128
+                    imageSource: agent.avatarUrl
+                    iconSource: ""
+                    imageSizeHint: -1
+                    fillMode: Image.PreserveAspectCrop
+                    maskRadius: Math.min(width, height) / 2
+                }
+
+                Label {
+                    Layout.fillWidth: true
+                    text: root.selectedIdentity ? root.selectedIdentity.label : ""
+                    color: Maui.Theme.textColor
+                    horizontalAlignment: Text.AlignHCenter
+                }
+
+                ComboBox {
+                    Layout.alignment: Qt.AlignHCenter
+                    visible: agent.identities.length > 1
+                    Layout.preferredWidth: 220
+                    model: agent.identities
+                    textRole: "label"
+                    currentIndex: agent.selectedIdentity
+                    onActivated: {
+                        root.resetTimeout()
+                        agent.selectIdentity(currentIndex)
+                    }
+                }
+
+                Maui.TextField {
+                    id: passwordField
+                    Layout.alignment: Qt.AlignHCenter
+                    Layout.topMargin: Maui.Style.space.medium
+                    Layout.preferredWidth: parent.width / 2
+                    Layout.maximumWidth: parent.width / 2
+                    visible: agent.prompt.length > 0
+                    placeholderText: agent.prompt || qsTr("Password")
+                    echoMode: agent.echo ? TextInput.Normal : TextInput.Password
+                    Maui.Controls.status: agent.error.length > 0 ? Maui.Controls.Negative : Maui.Controls.Normal
+                    onTextChanged: root.resetTimeout()
+                    onAccepted: root.submitResponse()
+                }
+
+                Label {
+                    Layout.fillWidth: true
+                    visible: agent.info.length > 0 || agent.error.length > 0
+                    text: agent.error.length > 0 ? agent.error : agent.info
+                    color: agent.error.length > 0 ? Maui.Theme.negativeTextColor : Maui.Theme.linkColor
+                    wrapMode: Text.WordWrap
+                    horizontalAlignment: Text.AlignHCenter
+                }
+
+                Item {
+                    Layout.fillWidth: true
+                    implicitHeight: Maui.Style.contentMargins
                 }
             }
         }
 
-        Maui.ScrollColumn {
-            id: contentColumn
-            anchors.fill: parent
-            clip: true
-            spacing: Maui.Style.space.small
+        Rectangle {
+            Layout.fillWidth: true
+            color: Maui.Theme.alternateBackgroundColor
+            radius: Maui.Style.radiusV
+            border.color: Maui.Theme.backgroundColor
+            border.width: 1
+            implicitHeight: detailsSection.implicitHeight + Maui.Style.contentMargins * 2
 
-            Maui.SectionHeader {
-                Layout.fillWidth: true
-                text1: qsTr("Authorization Required")
-                text2: root.displayedCommand.length > 0
-                    ? qsTr("Authentication is needed to run the following program as the superuser.")
-                    : (agent.message || qsTr("Authentication is needed to continue"))
-                template.label1.font.pointSize: Maui.Style.defaultFont.pointSize + 2
-                template.label1.font.bold: true
-                template.label1.color: Maui.Theme.textColor
-                template.label1.horizontalAlignment: Text.AlignHCenter
-                template.label2.font.pointSize: Maui.Style.defaultFont.pointSize
-                template.label2.color: Maui.Theme.textColor
-                template.label2.wrapMode: Text.WordWrap
-                template.label2.horizontalAlignment: Text.AlignHCenter
-            }
+            ColumnLayout {
+                id: detailsSection
+                anchors.fill: parent
+                anchors.margins: Maui.Style.contentMargins
+                spacing: Maui.Style.space.small
 
-            Rectangle {
-                Layout.fillWidth: true
-                color: Maui.Theme.alternateBackgroundColor
-                radius: Maui.Style.radiusV
-                border.color: Maui.Theme.backgroundColor
-                border.width: 1
-                implicitHeight: authenticationSection.implicitHeight + Maui.Style.contentMargins * 2
-
-                ColumnLayout {
-                    id: authenticationSection
-                    anchors.fill: parent
-                    anchors.margins: Maui.Style.contentMargins
-                    spacing: Maui.Style.space.small
-
-                    Maui.SectionHeader {
-                        Layout.fillWidth: true
-                        text1: qsTr("Authentication")
-                        text2: qsTr("Enter your credentials to authorize this request.")
-                        label2.wrapMode: Text.Wrap
-                    }
-
-                    Maui.IconItem {
-                        Layout.alignment: Qt.AlignHCenter
-                        Layout.preferredWidth: 128
-                        Layout.preferredHeight: 128
-                        imageSource: agent.avatarUrl
-                        iconSource: ""
-                        imageSizeHint: -1
-                        fillMode: Image.PreserveAspectCrop
-                        maskRadius: Math.min(width, height) / 2
-                    }
-
-                    Label {
-                        Layout.fillWidth: true
-                        text: root.selectedIdentity ? root.selectedIdentity.label : ""
-                        color: Maui.Theme.textColor
-                        horizontalAlignment: Text.AlignHCenter
-                    }
-
-                    ComboBox {
-                        Layout.alignment: Qt.AlignHCenter
-                        visible: agent.identities.length > 1
-                        Layout.preferredWidth: 220
-                        model: agent.identities
-                        textRole: "label"
-                        currentIndex: agent.selectedIdentity
-                        onActivated: {
-                            root.resetTimeout()
-                            agent.selectIdentity(currentIndex)
-                        }
-                    }
-
-                    Maui.TextField {
-                        id: passwordField
-                        Layout.alignment: Qt.AlignHCenter
-                        Layout.topMargin: Maui.Style.space.medium
-                        Layout.preferredWidth: parent.width / 2
-                        Layout.maximumWidth: parent.width / 2
-                        visible: agent.prompt.length > 0
-                        placeholderText: agent.prompt || qsTr("Password")
-                        echoMode: agent.echo ? TextInput.Normal : TextInput.Password
-                        Maui.Controls.status: agent.error.length > 0 ? Maui.Controls.Negative : Maui.Controls.Normal
-                        onTextChanged: root.resetTimeout()
-                        onAccepted: root.submitResponse()
-                    }
-
-                    Label {
-                        Layout.fillWidth: true
-                        visible: agent.info.length > 0 || agent.error.length > 0
-                        text: agent.error.length > 0 ? agent.error : agent.info
-                        color: agent.error.length > 0 ? Maui.Theme.negativeTextColor : Maui.Theme.linkColor
-                        wrapMode: Text.WordWrap
-                        horizontalAlignment: Text.AlignHCenter
-                    }
-
-                    Item {
-                        Layout.fillWidth: true
-                        implicitHeight: Maui.Style.contentMargins
+                Maui.FlexSectionItem {
+                    Layout.fillWidth: true
+                    flat: true
+                    label1.text: qsTr("Show details")
+                    label2.text: qsTr("Show PolicyKit action and vendor information.")
+                    label2.wrapMode: Text.Wrap
+                    template.content: Switch {
+                        checked: root.showDetails
+                        onToggled: root.showDetails = checked
                     }
                 }
-            }
 
-            Rectangle {
-                Layout.fillWidth: true
-                color: Maui.Theme.alternateBackgroundColor
-                radius: Maui.Style.radiusV
-                border.color: Maui.Theme.backgroundColor
-                border.width: 1
-                implicitHeight: detailsSection.implicitHeight + Maui.Style.contentMargins * 2
+                Maui.FlexSectionItem {
+                    Layout.fillWidth: true
+                    flat: true
+                    visible: root.showDetails
+                    label1.text: qsTr("Identity")
+                    label2.text: root.selectedIdentity ? root.selectedIdentity.label : ""
+                    label2.wrapMode: Text.Wrap
+                }
 
-                ColumnLayout {
-                    id: detailsSection
-                    anchors.fill: parent
-                    anchors.margins: Maui.Style.contentMargins
-                    spacing: Maui.Style.space.small
+                Maui.FlexSectionItem {
+                    Layout.fillWidth: true
+                    flat: true
+                    visible: root.showDetails
+                    label1.text: qsTr("Action ID")
+                    label2.text: agent.actionId
+                    label2.font.family: Maui.Style.monospacedFont.family
+                    label2.wrapMode: Text.Wrap
+                }
 
-                    Maui.FlexSectionItem {
+                Maui.FlexSectionItem {
+                    Layout.fillWidth: true
+                    flat: true
+                    visible: root.showDetails && root.displayedCommand.length > 0
+                    label1.text: qsTr("Program")
+                    label2.text: root.displayedCommand
+                    label2.font.family: Maui.Style.monospacedFont.family
+                    label2.wrapMode: Text.Wrap
+                }
+
+                Repeater {
+                    model: agent.details
+
+                    delegate: Maui.FlexSectionItem {
                         Layout.fillWidth: true
                         flat: true
-                        label1.text: qsTr("Show details")
-                        label2.text: qsTr("Show PolicyKit action and vendor information.")
-                        label2.wrapMode: Text.Wrap
-                        template.content: Switch {
-                            checked: root.showDetails
-                            onToggled: root.showDetails = checked
-                        }
-                    }
-
-                    Maui.FlexSectionItem {
-                        Layout.fillWidth: true
-                        flat: true
-                        visible: root.showDetails
-                        label1.text: qsTr("Identity")
-                        label2.text: root.selectedIdentity ? root.selectedIdentity.label : ""
+                        visible: root.showDetails && modelData.key !== "Action"
+                        label1.text: modelData.key
+                        label2.text: modelData.value
                         label2.wrapMode: Text.Wrap
                     }
+                }
 
-                    Maui.FlexSectionItem {
-                        Layout.fillWidth: true
-                        flat: true
-                        visible: root.showDetails
-                        label1.text: qsTr("Action ID")
-                        label2.text: agent.actionId
-                        label2.font.family: Maui.Style.monospacedFont.family
-                        label2.wrapMode: Text.Wrap
-                    }
-
-                    Maui.FlexSectionItem {
-                        Layout.fillWidth: true
-                        flat: true
-                        visible: root.showDetails && root.displayedCommand.length > 0
-                        label1.text: qsTr("Program")
-                        label2.text: root.displayedCommand
-                        label2.font.family: Maui.Style.monospacedFont.family
-                        label2.wrapMode: Text.Wrap
-                    }
-
-                    Repeater {
-                        model: agent.details
-
-                        delegate: Maui.FlexSectionItem {
-                            Layout.fillWidth: true
-                            flat: true
-                            visible: root.showDetails && modelData.key !== "Action"
-                            label1.text: modelData.key
-                            label2.text: modelData.value
-                            label2.wrapMode: Text.Wrap
-                        }
-                    }
-
-                    Maui.FlexSectionItem {
-                        Layout.fillWidth: true
-                        flat: true
-                        visible: root.showDetails && agent.vendorUrl.length > 0
-                        label1.text: qsTr("Vendor URL")
-                        label2.text: agent.vendorUrl
-                        label2.wrapMode: Text.Wrap
-                    }
+                Maui.FlexSectionItem {
+                    Layout.fillWidth: true
+                    flat: true
+                    visible: root.showDetails && agent.vendorUrl.length > 0
+                    label1.text: qsTr("Vendor URL")
+                    label2.text: agent.vendorUrl
+                    label2.wrapMode: Text.Wrap
                 }
             }
         }
