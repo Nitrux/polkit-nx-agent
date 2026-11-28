@@ -297,8 +297,10 @@ void PolkitAgent::sessionCompleted(bool gained)
 
 void PolkitAgent::submitResponse(const QString &response)
 {
-    if (m_session && !response.isEmpty())
+    if (m_session && !m_prompt.isEmpty() && !response.isEmpty()) {
+        setPrompt(QString(), false);
         m_session->setResponse(response);
+    }
 }
 
 void PolkitAgent::cancel()
@@ -379,6 +381,11 @@ void PolkitAgent::setPrompt(const QString &text, bool echo)
     prompt = prompt.trimmed();
     if (prompt.isEmpty() && !text.isEmpty())
         prompt = QStringLiteral("Password");
+    if (!prompt.isEmpty()) {
+        setInfo(QString());
+        if (m_error.trimmed() == QStringLiteral("Failed to match fingerprint"))
+            setError(QString());
+    }
     if (m_prompt == prompt && m_echo == echo)
         return;
     m_prompt = prompt;
@@ -388,6 +395,8 @@ void PolkitAgent::setPrompt(const QString &text, bool echo)
 
 void PolkitAgent::setInfo(const QString &text)
 {
+    if (!text.isEmpty() && m_error.trimmed() == QStringLiteral("Failed to match fingerprint"))
+        setError(QString());
     if (m_info == text)
         return;
     m_info = text;

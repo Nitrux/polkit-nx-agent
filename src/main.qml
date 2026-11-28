@@ -44,6 +44,10 @@ Maui.DialogWindow {
     property int remainingSeconds: timeoutSeconds
     property bool showDetails: false
 
+    readonly property bool pinRequested: !agent.echo && /\bpin\b/i.test(agent.prompt)
+    readonly property bool scanning: !agent.prompt && /^(please\s+)?(place|swipe|press|touch|scan)\b/i.test(agent.info.trim())
+    readonly property bool fingerprintMismatch: agent.error.trim() === "Failed to match fingerprint"
+
     function resetTimeout() {
         remainingSeconds = timeoutSeconds
         if (agent.active)
@@ -56,7 +60,7 @@ Maui.DialogWindow {
     }
 
     function submitResponse() {
-        if (passwordField.text.length > 0) {
+        if (passwordField.canSubmit) {
             agent.submitResponse(passwordField.text)
             passwordField.clear()
         }
@@ -112,7 +116,7 @@ Maui.DialogWindow {
 
             Button {
                 text: qsTr("Authorize")
-                enabled: passwordField.text.length > 0
+                enabled: passwordField.canSubmit
                 Maui.Controls.status: Maui.Controls.Positive
                 onClicked: root.submitResponse()
             }
@@ -200,6 +204,18 @@ Maui.DialogWindow {
                     Layout.preferredWidth: parent.width / 2
                     Layout.maximumWidth: parent.width / 2
                     visible: agent.prompt.length > 0
+                    readonly property bool canSubmit: visible && text.length > 0 && acceptableInput
+                    // Maui.TextField exposes its inline clear button through rightContent.
+                    Binding {
+                        target: passwordField.rightContent[0]
+                        property: "visible"
+                        when: root.pinRequested
+                        value: false
+                    }
+                    horizontalAlignment: root.pinRequested ? TextInput.AlignHCenter : TextInput.AlignLeft
+                    validator: root.pinRequested ? pinValidator : null
+                    RegularExpressionValidator { id: pinValidator; regularExpression: /[0-9]+/ }
+                    inputMethodHints: root.pinRequested ? Qt.ImhDigitsOnly | Qt.ImhHiddenText | Qt.ImhSensitiveData | Qt.ImhNoPredictiveText : Qt.ImhNone
                     placeholderText: agent.prompt || qsTr("Password")
                     echoMode: agent.echo ? TextInput.Normal : TextInput.Password
                     Maui.Controls.status: agent.error.length > 0 ? Maui.Controls.Negative : Maui.Controls.Normal
@@ -207,13 +223,61 @@ Maui.DialogWindow {
                     onAccepted: root.submitResponse()
                 }
 
+                GridLayout {
+                    visible: root.pinRequested
+                    Layout.alignment: Qt.AlignHCenter
+                    columns: 3
+                    rowSpacing: Maui.Style.space.small
+                    columnSpacing: rowSpacing
+
+                    Repeater {
+                        model: ["1", "2", "3", "4", "5", "6", "7", "8", "9", "⌫", "0", "✓"]
+                        Button {
+                            required property string modelData
+                            Layout.preferredWidth: Maui.Style.rowHeight * 1.5
+                            Layout.preferredHeight: Maui.Style.rowHeight * 1.5
+                            icon.name: modelData === "⌫" ? "edit-clear" : ""
+                            text: modelData === "⌫" ? "" : modelData
+                            Accessible.name: modelData === "✓" ? qsTr("Submit PIN")
+                                : modelData === "⌫" ? qsTr("Delete digit") : modelData
+                            enabled: modelData !== "✓" || passwordField.canSubmit
+                            onClicked: {
+                                if (modelData === "✓")
+                                    root.submitResponse()
+                                else if (modelData === "⌫")
+                                    passwordField.text = passwordField.text.slice(0, -1)
+                                else
+                                    passwordField.text += modelData
+                            }
+                        }
+                    }
+                }
+
                 Label {
                     Layout.fillWidth: true
                     visible: agent.info.length > 0 || agent.error.length > 0
-                    text: agent.error.length > 0 ? agent.error : agent.info
+                    text: root.fingerprintMismatch ? qsTr("Fingerprint did not match.")
+                        : agent.error.length > 0 ? agent.error
+                        : root.scanning ? qsTr("Place your finger on the sensor.") : agent.info
                     color: agent.error.length > 0 ? Maui.Theme.negativeTextColor : Maui.Theme.linkColor
                     wrapMode: Text.WordWrap
                     horizontalAlignment: Text.AlignHCenter
+                }
+
+                Maui.Chip {
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: Maui.Style.space.small
+                    visible: root.scanning && !agent.error
+                    enabled: false
+                    hoverEnabled: false
+                    color: Maui.Theme.highlightColor
+                    spacing: 0
+                    SequentialAnimation on opacity {
+                        running: root.scanning && !agent.error && agent.active
+                        loops: Animation.Infinite
+                        NumberAnimation { from: 0.35; to: 1; duration: 450 }
+                        NumberAnimation { from: 1; to: 0.35; duration: 450 }
+                    }
                 }
 
                 Item {
