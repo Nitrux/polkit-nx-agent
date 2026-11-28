@@ -259,7 +259,8 @@ Maui.DialogWindow {
                     text: root.fingerprintMismatch ? qsTr("Fingerprint did not match.")
                         : agent.error.length > 0 ? agent.error
                         : root.scanning ? qsTr("Place your finger on the sensor.") : agent.info
-                    color: agent.error.length > 0 ? Maui.Theme.negativeTextColor : Maui.Theme.linkColor
+                    color: agent.error.length > 0 ? Maui.Theme.negativeTextColor
+                        : Maui.Theme.textColor
                     wrapMode: Text.WordWrap
                     horizontalAlignment: Text.AlignHCenter
                 }
